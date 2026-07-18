@@ -48,15 +48,16 @@ package manager and swapping the adapter in `src/lib/db.ts` for
 `vercel.json` configures three Vercel Cron jobs, each hitting an API route
 guarded by `CRON_SECRET` (checked as `Authorization: Bearer $CRON_SECRET`):
 
-- `/api/cron/restock-alert` — hourly; logs variants at/under their reorder
+- `/api/cron/restock-alert` — daily; logs variants at/under their reorder
   threshold.
 - `/api/cron/forecast-recompute` — nightly; naive moving-average forecast
   per variant, writes `ForecastSnapshot` rows with a suggested reorder qty.
 - `/api/cron/dead-stock-scan` — nightly; flags in-stock variants with no
   sales in the trailing window as `DeadStockFlag` rows.
 
-Note: Vercel's Hobby plan limits cron jobs to once/day each — the schedules
-in `vercel.json` assume a Pro plan or above. Adjust if needed.
+All three schedules are once/day, so they work on Vercel's Hobby plan as-is.
+On a Pro plan or above you can tighten `restock-alert` to run more often
+(e.g. hourly) if that cadence is useful.
 
 ## Ad-hoc test scripts
 
