@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { apiError, requireApiSession } from "@/lib/api";
+import { hasRole } from "@/lib/auth";
 
 const updateProductSchema = z.object({
   name: z.string().min(1).optional(),
@@ -39,6 +40,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 /** Soft delete: products stay for audit/order history, just hidden from active views. */
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireApiSession();
+  if (!hasRole(session.role, "ADMIN")) return apiError("Forbidden", 403);
   const { id } = await params;
 
   const existing = await db.product.findFirst({ where: { id, tenantId: session.tenantId } });

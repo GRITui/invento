@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireSession } from "@/lib/session";
 import { Card, PageHeader } from "@/components/ui";
 import { AddVariantForm, VariantTable } from "@/components/variant-manager";
+import { ArchiveProductButton, EditProductButton } from "@/components/product-form";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
   const product = await db.product.findFirst({
     where: { id, tenantId: session.tenantId },
-    include: { variants: { where: { isActive: true }, orderBy: { createdAt: "asc" } } },
+    include: { variants: { orderBy: { createdAt: "asc" } } },
   });
 
   if (!product) notFound();
@@ -24,11 +25,21 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
     price: v.price.toString(),
     quantityOnHand: v.quantityOnHand,
     reorderThreshold: v.reorderThreshold,
+    isActive: v.isActive,
   }));
 
   return (
     <div>
-      <PageHeader title={product.name} description={product.description ?? undefined} />
+      <PageHeader
+        title={product.isActive ? product.name : `${product.name} (inactive)`}
+        description={product.description ?? undefined}
+        action={
+          <div className="flex items-center gap-2">
+            <EditProductButton product={{ id: product.id, name: product.name, description: product.description }} />
+            <ArchiveProductButton product={{ id: product.id, isActive: product.isActive }} />
+          </div>
+        }
+      />
 
       <Card className="p-0">
         <div className="p-4">

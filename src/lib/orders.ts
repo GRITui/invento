@@ -31,6 +31,16 @@ export async function transitionOrder(
   tx: TxClient,
   params: { tenantId: string; storeId: string | null; orderId: string; to: OrderStatus; actingUserId: string }
 ) {
+  // Lock the order row first so concurrent transitions on the same order
+  // serialize instead of both reading the same stale `from` status and
+  // double-applying stock movements (see handoff Section 3, step 4).
+  const locked = await tx.$queryRaw<{ id: string }[]>`
+    SELECT "id" FROM "Order"
+    WHERE "id" = ${params.orderId} AND "tenantId" = ${params.tenantId}
+    FOR UPDATE
+  `;
+  if (!locked[0]) throw new OrderNotFoundError(params.orderId);
+
   const order = await tx.order.findFirst({
     where: { id: params.orderId, tenantId: params.tenantId },
     include: { lines: true },

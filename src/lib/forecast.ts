@@ -14,6 +14,10 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export async function recomputeForecastSnapshots(db: PrismaClient, now: Date = new Date()): Promise<{ written: number }> {
   const periodEnd = now;
   const periodStart = new Date(periodEnd.getTime() - WINDOW_DAYS * DAY_MS);
+  // Round to the start of the day so that re-running the job for the same
+  // calendar day (cron retry, redeploy, manual re-trigger) is idempotent
+  // instead of piling up near-duplicate rows a few seconds apart.
+  const periodStartDay = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth(), periodStart.getUTCDate()));
 
   const sold = await db.stockMovement.groupBy({
     by: ["tenantId", "variantId"],
@@ -36,17 +40,31 @@ export async function recomputeForecastSnapshots(db: PrismaClient, now: Date = n
     const forecastQty = dailyAverage * 7;
     const suggestedReorderQty = Math.max(0, Math.ceil(dailyAverage * LEAD_TIME_DAYS) - variant.quantityOnHand);
 
-    await db.forecastSnapshot.create({
-      data: {
-        tenantId: row.tenantId,
-        variantId: row.variantId,
-        periodStart,
-        periodEnd,
-        method: "moving_average",
-        forecastQty,
-        suggestedReorderQty,
-      },
+    // Idempotency: a snapshot already exists for this variant/day (cron
+    // retry, redeploy, or manual re-trigger) — overwrite it instead of
+    // creating another row, mirroring the existing-record check in
+    // scanDeadStock().
+    const existing = await db.forecastSnapshot.findFirst({
+      where: { tenantId: row.tenantId, variantId: row.variantId, periodStart: periodStartDay },
     });
+    if (existing) {
+      await db.forecastSnapshot.update({
+        where: { id: existing.id },
+        data: { periodEnd, method: "moving_average", forecastQty, suggestedReorderQty },
+      });
+    } else {
+      await db.forecastSnapshot.create({
+        data: {
+          tenantId: row.tenantId,
+          variantId: row.variantId,
+          periodStart: periodStartDay,
+          periodEnd,
+          method: "moving_average",
+          forecastQty,
+          suggestedReorderQty,
+        },
+      });
+    }
     written++;
   }
 

@@ -6,10 +6,16 @@ import { formatCurrency } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProductsPage() {
+export default async function ProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ inactive?: string }>;
+}) {
   const session = await requireSession();
+  const { inactive } = await searchParams;
+  const showInactive = inactive === "1";
   const products = await db.product.findMany({
-    where: { tenantId: session.tenantId, isActive: true },
+    where: { tenantId: session.tenantId, isActive: !showInactive },
     include: { variants: { where: { isActive: true } } },
     orderBy: { createdAt: "desc" },
   });
@@ -19,11 +25,25 @@ export default async function ProductsPage() {
       <PageHeader
         title="Products"
         description="Manage catalog and stock levels."
-        action={<LinkButton href="/admin/products/new">New product</LinkButton>}
+        action={
+          <div className="flex items-center gap-2">
+            <Link
+              href={showInactive ? "/admin/products" : "/admin/products?inactive=1"}
+              className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              {showInactive ? "Show active products" : "Show inactive products"}
+            </Link>
+            <LinkButton href="/admin/products/new">New product</LinkButton>
+          </div>
+        }
       />
 
       {products.length === 0 ? (
-        <EmptyState message="No products yet. Create your first product to get started." />
+        <EmptyState
+          message={
+            showInactive ? "No inactive products." : "No products yet. Create your first product to get started."
+          }
+        />
       ) : (
         <Card className="p-0">
           <table className="w-full text-sm">

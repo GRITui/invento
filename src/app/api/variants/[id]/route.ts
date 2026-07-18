@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { apiError, requireApiSession } from "@/lib/api";
 import { applyStockMovement, InsufficientStockError } from "@/lib/inventory";
+import { hasRole } from "@/lib/auth";
 
 const updateVariantSchema = z.object({
   name: z.string().min(1).optional(),
@@ -61,6 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await requireApiSession();
+  if (!hasRole(session.role, "ADMIN")) return apiError("Forbidden", 403);
   const { id } = await params;
 
   const existing = await db.variant.findFirst({ where: { id, tenantId: session.tenantId } });
