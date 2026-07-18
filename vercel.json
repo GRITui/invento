@@ -1,0 +1,7 @@
+{
+  "crons": [
+    { "path": "/api/cron/restock-alert", "schedule": "0 * * * *" },
+    { "path": "/api/cron/forecast-recompute", "schedule": "0 2 * * *" },
+    { "path": "/api/cron/dead-stock-scan", "schedule": "30 2 * * *" }
+  ]
+}
